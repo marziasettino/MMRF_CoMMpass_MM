@@ -33,7 +33,6 @@ query.exp.count <- GDCquery(project = "MMRF-COMMPASS",
 GDCdownload(query.exp.count)
 
 
-
 ListBarcode1<-MMRFGDC_QuerySamples(query=query.exp.count,typesample="TBM") 
 ListBarcode2<-MMRFGDC_QuerySamples(query=query.exp.count,typesample="TRBM")
 
@@ -107,10 +106,12 @@ symbol.gene <- ensembldb::select(EnsDb.Hsapiens.v86, keys= G_list, keytype = "GE
 rownames(dataFilt)<-symbol.gene$SYMBOL
 
 
-
+#-------------------------DEA----------------
 
 dataFilt.TBM<-dataFilt[,colnames(dataFilt) %in% ListBarcode1]
 dataFilt.TRBM <- dataFilt[,colnames(dataFilt) %in% ListBarcode2]
+
+
 
 dataDEGs <- TCGAanalyze_DEA(dataFilt.TBM,
                             dataFilt.TRBM,
@@ -135,16 +136,14 @@ dataDEGsFiltLevel <- TCGAanalyze_LevelTab(dataDEGs,
 dataDEGsFiltLevel.rank<-dataDEGsFiltLevel[abs(dataDEGsFiltLevel$logFC)>3,]
 dataDEGsFiltLevel.rank<-dataDEGsFiltLevel.rank[dataDEGsFiltLevel.rank$FDR<0.05,]
 dataDEGsFiltLevel.rank<-dataDEGsFiltLevel.rank %>% arrange(FDR, -abs(logFC)) 
+rownames(dataDEGsFiltLevel.rank)<-dataDEGsFiltLevel.rank$mRNA
 
 
-
-
-
-TCGAVisualize_volcano(dataDEGs$logFC, dataDEGs$FDR,
+TCGAVisualize_volcano(dataDEGsFiltLevel.rank$logFC, dataDEGsFiltLevel.rank$FDR,
                       filename = "img/DEGs_volcano_OK2.png",
                       x.cut =1,
                       y.cut = 0.05,
-                      names = rownames(dataDEGs),
+                      names = rownames(dataDEGsFiltLevel.rank),
                       color = c("black","red","dodgerblue3"),
                       names.size = 2,
                       show.names = "highlighted",
@@ -158,12 +157,33 @@ TCGAVisualize_volcano(dataDEGs$logFC, dataDEGs$FDR,
 
 
 
+#-------------------------PCA----------------
+
+group1<-ListBarcode1[ListBarcode1 %in% colnames(dataFilt)] 
+group2<-ListBarcode2[ListBarcode2 %in% colnames(dataFilt)] 
 
 
 
 
 
-#Enrichnment Analysis----------------------------------------
+pca <- TCGAvisualize_PCA(dataFilt,dataDEGsFiltLevel.rank, ntopgenes =10,group1, group2)#ggbiplot with varname.size=6
+
+#group1=blue TBM
+#group2=red TRBM
+
+
+
+
+
+
+
+
+
+
+
+
+
+#-------------Enrichnment Analysis----------------------------------------
 
 Genelist <- rownames(dataDEGsFiltLevel.rank)
 
@@ -178,8 +198,8 @@ TCGAvisualize_EAbarplot(tf = rownames(ansEA$ResBP),
                         GOMFTab = ansEA$ResMF,
                         PathTab = ansEA$ResPat,
                         nRGTab = Genelist, 
-                        nBar = 10,
-                        text.size = 1.5)
+                        nBar = 5,
+                        text.size = 2.4)
 
 
 
@@ -190,100 +210,56 @@ TCGAvisualize_EAbarplot(tf = rownames(ansEA$ResBP),
 
 
 
-#---------------SURVIVAL--------------------------------------
+#---------------------------------------------------PREPARE SURVIVAL-------------
+
+
+
 
 
 dataMMcomplete <- log2(dataFilt)
-dataMMcomplete<-dataFilt
 
 
 
 
 
 
+#----------------------------------------------------------
 
 
 
 
 
-
-
-TabSurvKM <- MMRFGDC_SurvivalKM(clin.mm,
+TabSurvKM <- TCGAanalyze_SurvivalKM(clin.mm,
                                 dataMMcomplete,
-                                ListGenes = rownames(dataDEGs),
-                                Results = FALSE,
-                                High = 0.67,
-                                Low = 0.33,
-                                p.cut = 0.05,
-                                ListBarcode1,
-                                ListBarcode2)
+                                Genelist = rownames(dataDEGsFiltLevel.rank),
+                                Survresult = FALSE,
+                                ThreshTop = 0.67,
+                                ThreshDown = 0.33,
+                                p.cut = 0.05)
+
+
+
+
+
 
 
 TabSurvKM <- TabSurvKM[order(TabSurvKM$pvalue, decreasing=F),]
 
 
-TabSurvKM.10<-TabSurvKM[1:10,]
-surv.genes<-rownames(TabSurvKM.10)
+
+surv.genes<-rownames(TabSurvKM)
 
 
 
+#--------------------
 
-
-TabSurvKM.gene1 <- TCGAanalyze_SurvivalKM2(clin.mm,
-                                           dataMMcomplete,
-                                           ListGenes = surv.genes[1],
-                                           Results = TRUE,
-                                           High = 0.67,
-                                           Low = 0.33,
-                                           p.cut = 0.05,
-                                           ListBarcode1,
-                                           ListBarcode2)
-
-
-
-TabSurvKM.gene2 <- TCGAanalyze_SurvivalKM2(clin.mm,
-                                           dataMMcomplete,
-                                           ListGenes = surv.genes[2],
-                                           Results = TRUE,
-                                           High = 0.67,
-                                           Low = 0.33,
-                                           p.cut = 0.05,
-                                           ListBarcode1,
-                                           ListBarcode2)
-
-
-TabSurvKM.gene3 <- TCGAanalyze_SurvivalKM2(clin.mm,
-                                           dataMMcomplete,
-                                           ListGenes = surv.genes[3],
-                                           Results = TRUE,
-                                           High = 0.67,
-                                           Low = 0.33,
-                                           p.cut = 0.05,
-                                           ListBarcode1,
-                                           ListBarcode2)
-
-
-
-TabSurvKM.gene4 <- TCGAanalyze_SurvivalKM2(clin.mm,
-                                           dataMMcomplete,
-                                           ListGenes = surv.genes[4],
-                                           Results = TRUE,
-                                           High = 0.67,
-                                           Low = 0.33,
-                                           p.cut = 0.05,
-                                           ListBarcode1,
-                                           ListBarcode2)
-
-
-
-
-#-------------------------PCA----------------
-
-group1<-ListBarcode1[ListBarcode1 %in% colnames(dataFilt)] 
-group2<-ListBarcode2[ListBarcode2 %in% colnames(dataFilt)] 
-
-
-pca <- TCGAvisualize_PCA(dataFilt,dataDEGsFiltLevel.rank, ntopgenes = 10, ListBarcode1, ListBarcode2)
+TabSurvKM.gene1 <- TCGAanalyze_SurvivalKM(clin.mm,
+                                          dataMMcomplete,
+                                          Genelist = surv.genes[1],
+                                          Survresult = TRUE,
+                                          ThreshTop = 0.67,
+                                          ThreshDown = 0.33,
+                                          p.cut = 0.05)
 
 
 
@@ -295,11 +271,28 @@ pca <- TCGAvisualize_PCA(dataFilt,dataDEGsFiltLevel.rank, ntopgenes = 10, ListBa
 
 
 
+TabSurvKM.gene2 <- TCGAanalyze_SurvivalKM(clin.mm,
+                                          dataMMcomplete,
+                                          Genelist = surv.genes[2],
+                                          Survresult = TRUE,
+                                          ThreshTop = 0.67,
+                                          ThreshDown = 0.33,
+                                          p.cut = 0.05)
 
 
+TabSurvKM.gene3 <- TCGAanalyze_SurvivalKM(clin.mm,
+                                          dataMMcomplete,
+                                          Genelist = surv.genes[3],
+                                          Survresult = TRUE,
+                                          ThreshTop = 0.67,
+                                          ThreshDown = 0.33,
+                                          p.cut = 0.05)
 
 
-
-
-
-
+TabSurvKM.gene4 <- TCGAanalyze_SurvivalKM(clin.mm,
+                                          dataMMcomplete,
+                                          Genelist = surv.genes[4],
+                                          Survresult = TRUE,
+                                          ThreshTop = 0.67,
+                                          ThreshDown = 0.33,
+                                          p.cut = 0.05)
